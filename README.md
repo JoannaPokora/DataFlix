@@ -16,7 +16,7 @@ data, based on information from The Movie Database (TMDb).
   
 ## Access
   
-You can acces DataFlix via
+You can acces DataFlix at
 
 ------------------------------------------------------------------------------
 
