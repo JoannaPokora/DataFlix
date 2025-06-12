@@ -10,13 +10,13 @@ heatmap_SERVER <- function(id, dat){
   moduleServer(id, function(input, output, session){
     variables <- switch(
       id,
-      "heatmap_lang_pop" = c("vote_count", "original_language"),
-      "heatmap_lang_vote" = c("vote_average", "original_language"),
-      "heatmap_genre_pop" = c("vote_count", "name"),
-      "heatmap_genre_vote" = c("vote_average", "name") 
+      "heatmap_lang_pop" = c("vote_count", "language"),
+      "heatmap_lang_vote" = c("vote_average", "language"),
+      "heatmap_genre_pop" = c("vote_count", "genre"),
+      "heatmap_genre_vote" = c("vote_average", "genre") 
     )
     
-    x_lab <- ifelse(variables[2] == "original_language",
+    x_lab <- ifelse(variables[2] == "language",
                     "Oryginalny język",
                     "Gatunek")
     fill_name <- ifelse(variables[1] == "vote_count",
@@ -27,7 +27,7 @@ heatmap_SERVER <- function(id, dat){
                                "liczba ocen",
                                "ocena"),
                         " w zależności od roku i ",
-                        ifelse(variables[2] == "original_language",
+                        ifelse(variables[2] == "language",
                                "oryginalnego języka",
                                "gatunku"))
     limits <- if(variables[1] == "vote_count")
