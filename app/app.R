@@ -133,7 +133,8 @@ ui <- navbarPage(
                  tabPanel("Tabela",
                           br(),
                           column(10, offset = 1,
-                                 withSpinner(DTOutput("scatter_table"))      
+                                 withSpinner(DTOutput("scatter_table")),
+                                 br()
                           )
                  )
                )
@@ -172,10 +173,10 @@ ui <- navbarPage(
              ),
              mainPanel(
                tabsetPanel(
-                 tabPanel("Liczba ocen",
+                 tabPanel("Średnia ocena",
                    dist_UI("vote_dist")
                  ),
-                 tabPanel("Średnia ocena",
+                 tabPanel("Liczba ocen",
                    dist_UI("pop_dist")
                  )
                )
