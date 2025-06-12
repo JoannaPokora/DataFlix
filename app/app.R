@@ -14,8 +14,7 @@ source("app_supplementary/vis_module.R")
 source("app_supplementary/heatmap_module.R")
 
 ui <- navbarPage(
-  id = "main",
-  title = "Filmy",
+  title = "DataFlix",
   theme = shinytheme("sandstone"),
   
   tags$head(
@@ -52,7 +51,7 @@ ui <- navbarPage(
            )
   ),
   
-  tabPanel("Ocena vs liczba ocen",
+  tabPanel("Średnia ocena vs liczba ocen",
            sidebarLayout(
              sidebarPanel(
                sliderInput("year_scatter",
@@ -65,16 +64,16 @@ ui <- navbarPage(
                ),
                pickerInput("genre_scatter",
                  "Gatunki",
-                 choices = c("Action", "Adventure", "Animation", "Comedy",
-                             "Crime", "Documentary", "Drama", "Family",
-                             "Fantasy", "History", "Horror", "Music", "Mystery",
-                             "Romance", "Science Fiction", "TV Movie",
-                             "Thriller", "War", "Western"),
-                 selected = c("Action", "Adventure", "Animation", "Comedy",
-                              "Crime", "Documentary", "Drama", "Family",
-                              "Fantasy", "History", "Horror", "Music", "Mystery",
-                              "Romance", "Science Fiction", "TV Movie",
-                              "Thriller", "War", "Western"),
+                 choices = c("Akcja", "Przygodowy", "Animacja", "Komedia",
+                             "Kryminalny", "Dokumentalny", "Dramat",
+                             "Familijny", "Fantasy", "Historyczny", "Horror",
+                             "Muzyczny", "Mystery", "Romans", "Sci-Fi",
+                             "TV Film", "Thriller", "Wojenny", "Western"),
+                 selected = c("Akcja", "Przygodowy", "Animacja", "Komedia",
+                              "Kryminalny", "Dokumentalny", "Dramat",
+                              "Familijny", "Fantasy", "Historyczny", "Horror",
+                              "Muzyczny", "Mystery", "Romans", "Sci-Fi",
+                              "TV Film", "Thriller", "Wojenny", "Western"),
                  options = pickerOptions(
                    actionsBox = TRUE, 
                    selectedTextFormat = "count > 3",
@@ -157,6 +156,23 @@ ui <- navbarPage(
            )
   ),
   
+  tabPanel("Rozkłady",
+           sidebarLayout(
+             sidebarPanel(
+               selectInput("selected_genre", "Wybierz gatunek:",
+                           choices = c("Akcja", "Przygodowy", "Animacja", "Komedia", "Kryminalny", "Dokumentalny",
+                                       "Dramat", "Familijny", "Fantasy", "Historyczny", "Horror", "Muzyczny",
+                                       "Mystery", "Romans", "Sci-Fi", "TV Film", "Thriller", "Wojenny", "Western"),
+                           selected = "Przygodowy")
+             ),
+             mainPanel(
+               plotOutput("density_plot"),
+               plotOutput("boxplot_popularity"),
+               plotOutput("qqplot_popularity")
+             )
+           )
+  ),
+  
   tabPanel("Heatmapy",
            tabsetPanel(
              tabPanel("Liczba ocen",
@@ -167,7 +183,7 @@ ui <- navbarPage(
                       ),
                       br()
              ),
-             tabPanel("Ocena",
+             tabPanel("Średnia ocena",
                       br(),
                       fluidRow(
                         heatmap_UI("heatmap_lang_vote"),
@@ -182,13 +198,6 @@ ui <- navbarPage(
 server <- function(input, output) {
   dat <- readRDS("data/movies.RDS")
   genres <- readRDS("data/genres.RDS")
-  
-  language_keys <- c(angielski = "en", francuski = "fr", hiszpański =  "es",
-                     japoński = "ja", niemiecki = "de", portugalski = "pt",
-                     chiński = "zh", włoski = "it", rosyjski = "ru",
-                     koreański = "ko", czeski = "cs", arabski = "ar",
-                     niderlandzki = "nl", szwedzki = "sv", hindi = "hi",
-                     turecki = "tr", polski = "pl")
   
   output[["info"]] <- renderUI({
     fluidRow(
@@ -241,8 +250,8 @@ server <- function(input, output) {
     dat[
       year >= input[["year_scatter"]][1] &
         year <= input[["year_scatter"]][2] &
-        any(genres[name %in% input[["genre_scatter"]], id] %in% genre_ids) &
-        original_language %in% language_keys[input[["language_scatter"]]] &
+        any(genres[genre %in% input[["genre_scatter"]], id] %in% genre_ids) &
+        language %in% input[["language_scatter"]] &
         vote_count >= input[["min_vote_scatter"]]
     ]
   })
@@ -282,10 +291,10 @@ server <- function(input, output) {
       title,
       "<br>Gatunki: ",
       sapply(genre_ids, function(ids) {
-        paste0(genres[id %in% ids, name], collapse = ", ")
+        paste0(genres[id %in% ids, genre], collapse = ", ")
       }),
       "<br>Oryginalny język: ",
-      names(language_keys)[match(original_language, language_keys)],
+      language,
       "<br>Data premiery: ",
       release_date,
       "<br>Ocena: ",
@@ -314,10 +323,9 @@ server <- function(input, output) {
       .(title,
         genre = sapply(
           genre_ids,
-          function(ids) paste(genres[id %in% ids, name], collapse = ", ")
+          function(ids) paste(genres[id %in% ids, genre], collapse = ", ")
         ),
-        original_language =
-          names(language_keys)[match(original_language, language_keys)],
+        language,
         release_date,
         vote_average,
         vote_count)
@@ -331,55 +339,73 @@ server <- function(input, output) {
     srednia_ocena = round(mean(vote_average, na.rm = TRUE), 2),
     srednia_liczba_ocen = round(mean(vote_count, na.rm = TRUE), 2),
     liczba_filmow = .N
-    ), by = original_language]
+    ), by = language]
   
-  dane_jezyk <- dane_jezyk[order(-srednia_ocena)]
+  dane_jezyk_udzial <- dat[, .N, by = language]
+  dane_jezyk_udzial[, procent := round(N / sum(N) * 100, 1)]
   
-  vis_SERVER("language", dane_jezyk)
+  vis_SERVER("language", dane_jezyk, dane_jezyk_udzial)
   
-  gatunki_slownik <- data.table(
-    id = c(28, 12, 16, 35, 80, 99, 18, 10751, 14, 36, 27, 10402, 9648,
-           10749, 878, 10770, 53, 10752, 37),
-    nazwa = c("Akcja", "Przygodowy", "Animacja", "Komedia", "Kryminalny", "Dokumentalny",
-              "Dramat", "Familijny", "Fantasy", "Historyczny", "Horror", "Muzyczny",
-              "Mystery", "Romans", "Sci-Fi", "TV Film", "Thriller", "Wojenny", "Western")
-  )
+  filmy_gatunki <- data.table::copy(dat)
   
-  filmy_gatunki <- dat[, .(title, vote_average, vote_count, genre_ids)]
-  filmy_gatunki <- filmy_gatunki[
-    , .(id_gatunku = unlist(genre_ids)), 
-    by = .(title, vote_average, vote_count)
-  ][, id_gatunku := as.integer(id_gatunku)]
+  filmy_gatunki <- filmy_gatunki[, .(id = unlist(genre_ids), year,
+                                     vote_average, vote_count)]
+  filmy_gatunki <- genres_unnested[genres, on = .(id), genre := i.genre]
   
-  filmy_gatunki <- merge(filmy_gatunki, gatunki_slownik, by.x = "id_gatunku", by.y = "id", all.x = TRUE)
   dane_gatunek <- filmy_gatunki[, .(
     srednia_ocena = round(mean(vote_average, na.rm = TRUE), 2),
     srednia_liczba_ocen = round(mean(vote_count, na.rm = TRUE), 2),
     liczba_filmow = .N
-  ), by = nazwa][order(-srednia_ocena)]
+  ), by = genre]
   
-  vis_SERVER("genre", dane_gatunek)
+  dane_gatunek_udzial <- filmy_gatunki[, .N, by = genre]
+  dane_gatunek_udzial[, procent := round(N / sum(N) * 100, 1)]
+  
+  vis_SERVER("genre", dane_gatunek, dane_gatunek_udzial)
   
   dane_rok <- dat[, .(
     srednia_ocena = round(mean(vote_average, na.rm = TRUE), 2),
     srednia_liczba_ocen = round(mean(vote_count, na.rm = TRUE), 2),
     liczba_filmow = .N
-  ), by = year][order(year)]
+  ), by = year]
   
-  vis_SERVER("year", dane_rok)
+  dane_rok_udzial <- dat[, .N, by = year]
+  dane_rok_udzial[, procent := round(N / sum(N) * 100, 1)]
   
-  heatmap_dat <- data.table::copy(dat)
-  heatmap_dat[, original_language :=
-                names(language_keys)[match(original_language, language_keys)]]
+  vis_SERVER("year", dane_rok, dane_rok_udzial)
   
-  genres_unnested <- heatmap_dat[, .(id = unlist(genre_ids), year,
-                                     vote_average, vote_count)]
-  genres_unnested <- genres_unnested[genres, on = .(id)]
+  observe({
+    dane_kategoria <- filmy_gatunki[genre == input$selected_genre]
+    
+    output$density_plot <- renderPlot({
+      ggplot(dane_kategoria, aes(x = vote_average)) +
+        geom_density(fill = "skyblue", alpha = 0.5) +
+        labs(title = paste("Rozkład ocen –", input$selected_genre),
+             x = "Ocena", y = "Gęstość") +
+        theme_minimal()
+    })
+    
+    output$boxplot_popularity <- renderPlot({
+      ggplot(dane_kategoria, aes(y = vote_count)) +
+        geom_boxplot(fill = "lightgreen") +
+        labs(title = paste("Boxplot popularności –", input$selected_genre),
+             y = "Liczba ocen") +
+        theme_minimal()
+    })
+    
+    output$qqplot_popularity <- renderPlot({
+      ggplot(dane_kategoria, aes(sample = popularity)) +
+        stat_qq() +
+        stat_qq_line() +
+        labs(title = paste("QQ-Plot liczby ocen –", input$selected_genre)) +
+        theme_minimal()
+    })
+  })
   
-  heatmap_SERVER("heatmap_lang_pop", heatmap_dat)
-  heatmap_SERVER("heatmap_lang_vote", heatmap_dat)
-  heatmap_SERVER("heatmap_genre_pop", genres_unnested)
-  heatmap_SERVER("heatmap_genre_vote", genres_unnested)
+  heatmap_SERVER("heatmap_lang_pop", dat)
+  heatmap_SERVER("heatmap_lang_vote", dat)
+  heatmap_SERVER("heatmap_genre_pop", filmy_gatunki)
+  heatmap_SERVER("heatmap_genre_vote", filmy_gatunki)
 }
 
 shinyApp(ui = ui, server = server)
