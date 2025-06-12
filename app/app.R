@@ -12,6 +12,7 @@ library(scales)
 
 source("app_supplementary/vis_module.R")
 source("app_supplementary/heatmap_module.R")
+source("app_supplementary/dist_module.R")
 
 ui <- navbarPage(
   title = "DataFlix",
@@ -124,9 +125,10 @@ ui <- navbarPage(
                           br(),
                           uiOutput("scatter_info"),
                           br(),
-                          column(12,
+                          column(11,
                                  withSpinner(girafeOutput("main_scatter"))
-                          )        
+                          ),
+                          br()
                  ),
                  tabPanel("Tabela",
                           br(),
@@ -159,35 +161,51 @@ ui <- navbarPage(
   tabPanel("Rozkłady",
            sidebarLayout(
              sidebarPanel(
-               selectInput("selected_genre", "Wybierz gatunek:",
-                           choices = c("Akcja", "Przygodowy", "Animacja", "Komedia", "Kryminalny", "Dokumentalny",
-                                       "Dramat", "Familijny", "Fantasy", "Historyczny", "Horror", "Muzyczny",
-                                       "Mystery", "Romans", "Sci-Fi", "TV Film", "Thriller", "Wojenny", "Western"),
-                           selected = "Przygodowy")
+               selectInput("selected_type",
+                           "Wybierz zmienną:",
+                           choices = c("język", "gatunek", "rok")
+               ),
+               selectInput("selected_value",
+                           "Wybierz wartość:",
+                           choices = character(0)
+              )
              ),
              mainPanel(
-               plotOutput("density_plot"),
-               plotOutput("boxplot_popularity"),
-               plotOutput("qqplot_popularity")
+               tabsetPanel(
+                 tabPanel("Liczba ocen",
+                   dist_UI("vote_dist")
+                 ),
+                 tabPanel("Średnia ocena",
+                   dist_UI("pop_dist")
+                 )
+               )
              )
            )
   ),
   
   tabPanel("Heatmapy",
            tabsetPanel(
-             tabPanel("Liczba ocen",
+             tabPanel("Język",
                       br(),
                       fluidRow(
-                        heatmap_UI("heatmap_lang_pop"),
-                        heatmap_UI("heatmap_genre_pop")
+                        column(5, offset = 1,
+                               heatmap_UI("heatmap_lang_pop") 
+                        ),
+                        column(5,
+                               heatmap_UI("heatmap_lang_vote")
+                        )
                       ),
                       br()
              ),
-             tabPanel("Średnia ocena",
+             tabPanel("Gatunek",
                       br(),
                       fluidRow(
-                        heatmap_UI("heatmap_lang_vote"),
-                        heatmap_UI("heatmap_genre_vote")
+                        column(5, offset = 1,
+                               heatmap_UI("heatmap_genre_pop")
+                        ),
+                        column(5,
+                               heatmap_UI("heatmap_genre_vote")
+                        )
                       ),
                       br()
              )
@@ -349,8 +367,8 @@ server <- function(input, output) {
   filmy_gatunki <- data.table::copy(dat)
   
   filmy_gatunki <- filmy_gatunki[, .(id = unlist(genre_ids), year,
-                                     vote_average, vote_count)]
-  filmy_gatunki <- genres_unnested[genres, on = .(id), genre := i.genre]
+                                     vote_average, vote_count, language)]
+  filmy_gatunki <- filmy_gatunki[genres, on = .(id), genre := i.genre]
   
   dane_gatunek <- filmy_gatunki[, .(
     srednia_ocena = round(mean(vote_average, na.rm = TRUE), 2),
@@ -375,31 +393,29 @@ server <- function(input, output) {
   vis_SERVER("year", dane_rok, dane_rok_udzial)
   
   observe({
-    dane_kategoria <- filmy_gatunki[genre == input$selected_genre]
+    req(input[["selected_type"]])
     
-    output$density_plot <- renderPlot({
-      ggplot(dane_kategoria, aes(x = vote_average)) +
-        geom_density(fill = "skyblue", alpha = 0.5) +
-        labs(title = paste("Rozkład ocen –", input$selected_genre),
-             x = "Ocena", y = "Gęstość") +
-        theme_minimal()
-    })
-    
-    output$boxplot_popularity <- renderPlot({
-      ggplot(dane_kategoria, aes(y = vote_count)) +
-        geom_boxplot(fill = "lightgreen") +
-        labs(title = paste("Boxplot popularności –", input$selected_genre),
-             y = "Liczba ocen") +
-        theme_minimal()
-    })
-    
-    output$qqplot_popularity <- renderPlot({
-      ggplot(dane_kategoria, aes(sample = popularity)) +
-        stat_qq() +
-        stat_qq_line() +
-        labs(title = paste("QQ-Plot liczby ocen –", input$selected_genre)) +
-        theme_minimal()
-    })
+    updateSelectInput(
+      inputId = "selected_value",
+      choices = switch(
+        input[["selected_type"]],
+        "język" = c("angielski", "francuski", "hiszpański",
+                    "japoński", "niemiecki", "portugalski",
+                    "chiński", "włoski", "rosyjski",
+                    "koreański", "czeski", "arabski",
+                    "niderlandzki", "szwedzki", "hindi",
+                    "turecki", "polski"),
+        "gatunek" = genres[["genre"]],
+        "rok" = 1950:2024
+      )
+    )
+  })
+  
+  observe({
+    dist_SERVER("vote_dist", filmy_gatunki, input[["selected_type"]],
+                input[["selected_value"]])
+    dist_SERVER("pop_dist", filmy_gatunki, input[["selected_type"]],
+                input[["selected_value"]])
   })
   
   heatmap_SERVER("heatmap_lang_pop", dat)
