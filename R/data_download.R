@@ -11,6 +11,10 @@ perc <- 0.009
 page_items <- 20
 
 genres <- as.data.table(TMDb::genres_movie_list(api_key)$genres)
+genres[, genre := c("Akcja", "Przygodowy", "Animacja", "Komedia", "Kryminalny",
+                    "Dokumentalny", "Dramat", "Familijny", "Fantasy",
+                    "Historyczny", "Horror", "Muzyczny", "Mystery", "Romans",
+                    "Sci-Fi", "TV Film", "Thriller", "Wojenny", "Western")]
 saveRDS(genres, "genres.RDS")
 
 keys <- list(with_genres = genres[["id"]],
@@ -101,15 +105,20 @@ found_movies <- discover_movie(api_key = api_key,
                                page = 353)[["results"]]
 movies <- rbind(movies, found_movies[, names(movies)])
 
-language_keys <- c(angielski = "en", francuski = "fr", hiszpański =  "es",
-                   japoński = "ja", niemiecki = "de", portugalski = "pt",
-                   chiński = "zh", włoski = "it", rosyjski = "ru",
-                   koreański = "ko", czeski = "cs", arabski = "ar",
-                   niderlandzki = "nl", szwedzki = "sv", hindi = "hi",
-                   turecki = "tr", polski = "pl")
+language_keys <- data.table(
+  language = c("angielski", "francuski", "hiszpański",
+               "japoński", "niemiecki", "portugalski",
+               "chiński", "włoski", "rosyjski",
+               "koreański", "czeski", "arabski",
+               "niderlandzki", "szwedzki", "hindi",
+               "turecki", "polski"),
+  id = c("en", "fr", "es", "ja", "de", "pt", "zh", "it", "ru", "ko", "cs",
+         "ar", "nl", "sv", "hi", "tr", "pl")
+)
 
-filtered_dat <- unique(movies[original_language %in% language_keys,],
+filtered_dat <- unique(movies[original_language %in% language_keys[["id"]],],
                        by = "id")
+filtered_dat <- filtered_dat[language_keys, on = .(original_language == id)]
 filtered_dat <- filtered_dat[!is.na(release_date) & nchar(release_date) > 0,]
 filtered_dat[, year := as.integer(substr(release_date, 1, 4))]
 filtered_dat <- filtered_dat[year >= min(keys[["year"]]) &
